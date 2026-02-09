@@ -53,14 +53,28 @@ OpenClaw now includes a **SmartModelRouter** that automatically selects the most
 
 See [SmartModelRouter Documentation](SMART_ROUTER_README.md) for details.
 
-## Install (recommended)
+## Install (This Fork)
+
+This is a customized version of OpenClaw with **SmartModelRouter**. To use this version, install from source:
 
 Runtime: **Node ≥22**.
 
 ```bash
-npm install -g openclaw@latest
-# or: pnpm add -g openclaw@latest
+# 1. Clone this repository
+git clone https://github.com/Richard-JHLee/openclaw.git
+cd openclaw
 
+# 2. Install dependencies & Build
+pnpm install
+pnpm build
+
+# 3. Link globally (to use 'openclaw' command)
+npm link
+```
+
+After linking, you can use the `openclaw` command just like the original version:
+
+```bash
 openclaw onboard --install-daemon
 ```
 
