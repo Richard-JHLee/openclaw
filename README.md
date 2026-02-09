@@ -53,6 +53,27 @@ OpenClaw now includes a **SmartModelRouter** that automatically selects the most
 
 See [SmartModelRouter Documentation](SMART_ROUTER_README.md) for details.
 
+### 🧩 How Smart Routing Works
+
+The router calculates a **complexity score (0-100)** based on:
+
+1.  **Code Detection**: `+25 points` (Programming keywords, code blocks)
+2.  **Math/Logic**: `+20 points` (Equations, LaTeX, calculation requests)
+3.  **Multi-step Tasks**: `+15 points` (Words like "plan", "step-by-step", "implement")
+4.  **Input Length**: `+1 point` per 100 characters (max 20)
+5.  **Attachments**: `+20 points` if images or files are included
+6.  **Complexity Bonus**: Extra points if multiple features are present together
+
+#### Model Tiers
+
+| Score Range | Tier | Recommended Models | Use Case |
+| :--- | :--- | :--- | :--- |
+| **0 - 34** | **Cheap** | `gpt-4o-mini`, `claude-3-haiku` | Simple chat, greetings, short Q&A |
+| **35 - 64** | **Mid** | `gpt-4o`, `claude-3-5-sonnet` | Standard coding, explanations, summaries |
+| **65 - 100** | **Premium**| `o1`, `o3`, `claude-3-opus` | Complex reasoning, architecture design, math |
+
+You can customize these thresholds in `src/model-routing/defaults.ts` or via config.
+
 ## Install (This Fork)
 
 This is a customized version of OpenClaw with **SmartModelRouter**. To use this version, install from source:
