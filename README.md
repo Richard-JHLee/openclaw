@@ -110,12 +110,20 @@ Full beginner guide (auth, pairing, channels): [Getting started](https://docs.op
 ```bash
 openclaw onboard --install-daemon
 
+# 📊 Start Dashboard (See Smart Routing stats!)
+# 1. Start gateway service
+openclaw gateway start
+
+# 2. Open dashboard in browser
+openclaw dashboard
+
+# (Alternative) Manual gateway start
 openclaw gateway --port 18789 --verbose
 
 # Send a message
 openclaw message send --to +1234567890 --message "Hello from OpenClaw"
 
-# Talk to the assistant (optionally deliver back to any connected channel: WhatsApp/Telegram/Slack/Discord/Google Chat/Signal/iMessage/BlueBubbles/Microsoft Teams/Matrix/Zalo/Zalo Personal/WebChat)
+# Talk to the assistant (SmartModelRouter will optimize this!)
 openclaw agent --message "Ship checklist" --thinking high
 ```
 
