@@ -63,12 +63,13 @@ The wizard starts with **QuickStart** (defaults) vs **Advanced** (full control).
 **Local mode (default)** walks you through these steps:
 
 1. **Model/Auth** — Anthropic API key (recommended), OAuth, OpenAI, or other providers. Pick a default model.
-2. **Workspace** — Location for agent files (default `~/.openclaw/workspace`). Seeds bootstrap files.
-3. **Gateway** — Port, bind address, auth mode, Tailscale exposure.
-4. **Channels** — WhatsApp, Telegram, Discord, Google Chat, Mattermost, Signal, BlueBubbles, or iMessage.
-5. **Daemon** — Installs a LaunchAgent (macOS) or systemd user unit (Linux/WSL2).
-6. **Health check** — Starts the Gateway and verifies it's running.
-7. **Skills** — Installs recommended skills and optional dependencies.
+2. **Organization template** — Pick a domain template and `orgRoot` to create role-based agents and per-agent `workspace`/`agentDir` paths.
+3. **Workspace** — Location for agent files (default `~/.openclaw/workspace`). Seeds bootstrap files.
+4. **Gateway** — Port, bind address, auth mode, Tailscale exposure.
+5. **Channels** — WhatsApp, Telegram, Discord, Google Chat, Mattermost, Signal, BlueBubbles, or iMessage.
+6. **Daemon** — Installs a LaunchAgent (macOS) or systemd user unit (Linux/WSL2).
+7. **Health check** — Starts the Gateway and verifies it's running.
+8. **Skills** — Installs recommended skills and optional dependencies.
 
 <Note>
 Re-running the wizard does **not** wipe anything unless you explicitly choose **Reset** (or pass `--reset`).
@@ -94,6 +95,18 @@ Notes:
 - Default workspaces follow `~/.openclaw/workspace-<agentId>`.
 - Add `bindings` to route inbound messages (the wizard can do this).
 - Non-interactive flags: `--model`, `--agent-dir`, `--bind`, `--non-interactive`.
+
+## Organization template output
+
+When you select an organization template, onboarding generates:
+
+- Role-based `agents.list[]` entries (for example `app-service-dev-ceo`, `app-service-dev-dev`)
+- `tools.agentToAgent` allowlist for those generated agent IDs
+- Per-agent directories at `<orgRoot>/<agentId>/workspace` and `<orgRoot>/<agentId>/.openclaw/agent`
+- Shared team docs under `<orgRoot>/shared/` including PRD, architecture, test plan, and status board templates
+- If Telegram is selected in onboarding, the wizard can also create peer-based `bindings[]` rules for team agents (DM/group -> agent)
+
+See also: [Multi-agent](/concepts/multi-agent).
 
 ## Full reference
 

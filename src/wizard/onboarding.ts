@@ -7,6 +7,8 @@ import type {
 import type { OpenClawConfig } from "../config/config.js";
 import type { RuntimeEnv } from "../runtime.js";
 import type { QuickstartGatewayDefaults, WizardFlow } from "./onboarding.types.js";
+import fs from "node:fs/promises";
+import path from "node:path";
 import { ensureAuthProfileStore } from "../agents/auth-profiles.js";
 import { listChannelPlugins } from "../channels/plugins/index.js";
 import { formatCliCommand } from "../cli/command-format.js";
@@ -41,7 +43,88 @@ import { defaultRuntime } from "../runtime.js";
 import { resolveUserPath } from "../utils.js";
 import { finalizeOnboardingWizard } from "./onboarding.finalize.js";
 import { configureGatewayForOnboarding } from "./onboarding.gateway-config.js";
+import type { OrgDomainTemplateId } from "./org-templates/registry.js";
+import {
+  applyOrgTemplateConfig,
+  buildOrgTemplateConfigSpec,
+  mergeOrgTemplateTelegramPeerBindings,
+  type OrgTemplateTelegramPeerRoute,
+} from "./org-templates/config.js";
+import { seedOrgTemplateFilesystem } from "./org-templates/filesystem.js";
+import { listOrgDomainTemplates } from "./org-templates/registry.js";
 import { WizardCancelledError, type WizardPrompter } from "./prompts.js";
+
+async function pathExists(p: string): Promise<boolean> {
+  try {
+    await fs.access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function resolveDefaultOrgRootDir(domainTemplateId: string): Promise<string> {
+  const t9Mounted = process.platform === "darwin" && (await pathExists("/Volumes/T9"));
+  const base = t9Mounted ? "/Volumes/T9/workproject/openclaw-org" : "~/openclaw-org";
+  return path.join(base, domainTemplateId);
+}
+
+async function promptOrgTemplateTelegramRoutes(params: {
+  prompter: WizardPrompter;
+  templateAgentIds: string[];
+  defaultTelegramAccountId?: string;
+}): Promise<OrgTemplateTelegramPeerRoute[]> {
+  if (params.templateAgentIds.length === 0) {
+    return [];
+  }
+
+  const wants = await params.prompter.confirm({
+    message: "Configure Telegram routing for team agents now?",
+    initialValue: true,
+  });
+  if (!wants) {
+    return [];
+  }
+
+  const routes: OrgTemplateTelegramPeerRoute[] = [];
+  let keepAdding = true;
+  while (keepAdding) {
+    const peerKind = await params.prompter.select<"dm" | "group">({
+      message: "Telegram routing target type",
+      options: [
+        { value: "dm", label: "Direct message (user id)" },
+        { value: "group", label: "Group (chat id or chat id + topic)" },
+      ],
+      initialValue: "dm",
+    });
+
+    const peerId = await params.prompter.text({
+      message:
+        peerKind === "dm"
+          ? "Telegram user id (e.g. 123456789)"
+          : "Telegram group id (e.g. -1001234567890 or -1001234567890:topic:99)",
+      validate: (value) => (value.trim() ? undefined : "Required"),
+    });
+
+    const agentId = await params.prompter.select<string>({
+      message: "Route this Telegram target to agent",
+      options: params.templateAgentIds.map((id) => ({ value: id, label: id })),
+      initialValue: params.templateAgentIds[0],
+    });
+
+    routes.push({
+      agentId,
+      accountId: params.defaultTelegramAccountId?.trim() || undefined,
+      peer: { kind: peerKind, id: peerId.trim() },
+    });
+
+    keepAdding = await params.prompter.confirm({
+      message: "Add another Telegram routing rule?",
+      initialValue: false,
+    });
+  }
+  return routes;
+}
 
 async function requireRiskAcknowledgement(params: {
   opts: OnboardOptions;
@@ -153,6 +236,7 @@ export async function runOnboardingWizard(
     flow = "advanced";
   }
 
+  let configHandling: "keep" | "modify" | "reset" = "modify";
   if (snapshot.exists) {
     await prompter.note(summarizeExistingConfig(baseConfig), "Existing config detected");
 
@@ -164,6 +248,7 @@ export async function runOnboardingWizard(
         { value: "reset", label: "Reset" },
       ],
     });
+    configHandling = action as "keep" | "modify" | "reset";
 
     if (action === "reset") {
       const workspaceDefault = baseConfig.agents?.defaults?.workspace ?? DEFAULT_WORKSPACE;
@@ -340,6 +425,36 @@ export async function runOnboardingWizard(
     return;
   }
 
+  const orgDomainTemplateId = await prompter.select<OrgDomainTemplateId>({
+    message: "Organization template (domain)",
+    options: listOrgDomainTemplates().map((tmpl) => ({
+      value: tmpl.id as OrgDomainTemplateId,
+      label: tmpl.label,
+      hint: tmpl.description,
+    })),
+    initialValue: "app-service-dev" as OrgDomainTemplateId,
+  });
+
+  const orgRootInput = await prompter.text({
+    message: "Organization root directory (orgRoot)",
+    initialValue: await resolveDefaultOrgRootDir(orgDomainTemplateId),
+    validate: (value) => {
+      if (!value.trim()) {
+        return "Please enter a directory path (cannot be empty).";
+      }
+      return undefined;
+    },
+  });
+  const orgRootDir = resolveUserPath(orgRootInput.trim());
+  const orgTemplateSpec = buildOrgTemplateConfigSpec({
+    domainTemplateId: orgDomainTemplateId,
+    orgRootDir,
+  });
+  await prompter.note(
+    [`Domain: ${orgDomainTemplateId}`, `Org root: ${orgRootDir}`].join("\n"),
+    "Organization template",
+  );
+
   const workspaceInput =
     opts.workspace ??
     (flow === "quickstart"
@@ -365,6 +480,12 @@ export async function runOnboardingWizard(
       mode: "local",
     },
   };
+  nextConfig = applyOrgTemplateConfig({
+    baseConfig: nextConfig,
+    domainTemplateId: orgDomainTemplateId,
+    orgRootDir,
+    policy: configHandling === "keep" ? "keep" : "modify",
+  });
 
   const authStore = ensureAuthProfileStore(undefined, {
     allowKeychainPrompt: false,
@@ -421,6 +542,8 @@ export async function runOnboardingWizard(
   if (opts.skipChannels ?? opts.skipProviders) {
     await prompter.note("Skipping channel setup.", "Channels");
   } else {
+    const selectedChannels: string[] = [];
+    const selectedAccountIdsByChannel = new Map<string, string>();
     const quickstartAllowFromChannels =
       flow === "quickstart"
         ? listChannelPlugins()
@@ -433,7 +556,28 @@ export async function runOnboardingWizard(
       skipDmPolicyPrompt: flow === "quickstart",
       skipConfirm: flow === "quickstart",
       quickstartDefaults: flow === "quickstart",
+      onSelection: (selection) => {
+        selectedChannels.splice(0, selectedChannels.length, ...selection);
+      },
+      onAccountId: (channel, accountId) => {
+        selectedAccountIdsByChannel.set(channel, accountId);
+      },
     });
+
+    const configuredTelegram = selectedChannels.includes("telegram");
+    if (configuredTelegram && configHandling !== "keep") {
+      const telegramRoutes = await promptOrgTemplateTelegramRoutes({
+        prompter,
+        templateAgentIds: orgTemplateSpec.agentIds,
+        defaultTelegramAccountId: selectedAccountIdsByChannel.get("telegram"),
+      });
+      if (telegramRoutes.length > 0) {
+        nextConfig = {
+          ...nextConfig,
+          bindings: mergeOrgTemplateTelegramPeerBindings(nextConfig.bindings, telegramRoutes),
+        };
+      }
+    }
   }
 
   await writeConfigFile(nextConfig);
@@ -441,6 +585,13 @@ export async function runOnboardingWizard(
   await ensureWorkspaceAndSessions(workspaceDir, runtime, {
     skipBootstrap: Boolean(nextConfig.agents?.defaults?.skipBootstrap),
   });
+  if (configHandling !== "keep") {
+    await seedOrgTemplateFilesystem({
+      domainTemplateId: orgDomainTemplateId,
+      orgRootDir,
+      runtime,
+    });
+  }
 
   if (opts.skipSkills) {
     await prompter.note("Skipping skills setup.", "Skills");

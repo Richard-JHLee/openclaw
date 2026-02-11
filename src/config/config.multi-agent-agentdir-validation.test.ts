@@ -54,4 +54,45 @@ describe("multi-agent agentDir validation", () => {
       spy.mockRestore();
     });
   });
+
+  it("detects duplicates after agentDir path normalization", async () => {
+    vi.resetModules();
+    const { validateConfigObject } = await import("./config.js");
+    const base = path.join(tmpdir(), "openclaw-agentdir-normalize");
+    const normalized = path.join(base, "shared", "agent");
+    const withDotSegments = path.join(base, "team-a", "..", "shared", "agent", ".");
+
+    const res = validateConfigObject({
+      agents: {
+        list: [
+          { id: "ceo", agentDir: normalized },
+          { id: "cto", agentDir: `${withDotSegments}/` },
+        ],
+      },
+    });
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.issues[0]?.message).toContain("Duplicate agentDir");
+    }
+  });
+
+  it("returns duplicate detection deterministically across re-runs", async () => {
+    vi.resetModules();
+    const { findDuplicateAgentDirs } = await import("./agent-dirs.js");
+    const shared = path.join(tmpdir(), "openclaw-shared-idempotent", "agent");
+    const cfg = {
+      agents: {
+        list: [
+          { id: "b", agentDir: shared },
+          { id: "a", agentDir: `${shared}/` },
+        ],
+      },
+      bindings: [{ agentId: "a", match: { channel: "cli", accountId: "*" } }],
+    };
+
+    const first = findDuplicateAgentDirs(cfg);
+    const second = findDuplicateAgentDirs(cfg);
+    expect(first).toEqual(second);
+    expect(first[0]?.agentIds).toEqual(["a", "b"]);
+  });
 });

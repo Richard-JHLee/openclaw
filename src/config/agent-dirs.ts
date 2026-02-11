@@ -20,8 +20,13 @@ export class DuplicateAgentDirError extends Error {
   }
 }
 
+function normalizeAndResolveAgentDir(agentDir: string): string {
+  const expanded = resolveUserPath(agentDir.trim());
+  return path.resolve(path.normalize(expanded));
+}
+
 function canonicalizeAgentDir(agentDir: string): string {
-  const resolved = path.resolve(agentDir);
+  const resolved = normalizeAndResolveAgentDir(agentDir);
   if (process.platform === "darwin" || process.platform === "win32") {
     return resolved.toLowerCase();
   }
@@ -66,10 +71,10 @@ function resolveEffectiveAgentDir(
     : undefined;
   const trimmed = configured?.trim();
   if (trimmed) {
-    return resolveUserPath(trimmed);
+    return normalizeAndResolveAgentDir(trimmed);
   }
   const root = resolveStateDir(deps?.env ?? process.env, deps?.homedir ?? os.homedir);
-  return path.join(root, "agents", id, "agent");
+  return normalizeAndResolveAgentDir(path.join(root, "agents", id, "agent"));
 }
 
 export function findDuplicateAgentDirs(
@@ -83,13 +88,21 @@ export function findDuplicateAgentDirs(
     const key = canonicalizeAgentDir(agentDir);
     const entry = byDir.get(key);
     if (entry) {
-      entry.agentIds.push(agentId);
+      if (!entry.agentIds.includes(agentId)) {
+        entry.agentIds.push(agentId);
+      }
     } else {
       byDir.set(key, { agentDir, agentIds: [agentId] });
     }
   }
 
-  return [...byDir.values()].filter((v) => v.agentIds.length > 1);
+  return [...byDir.values()]
+    .filter((v) => v.agentIds.length > 1)
+    .map((duplicate) => ({
+      agentDir: duplicate.agentDir,
+      agentIds: [...duplicate.agentIds].sort((a, b) => a.localeCompare(b)),
+    }))
+    .sort((a, b) => a.agentDir.localeCompare(b.agentDir));
 }
 
 export function formatDuplicateAgentDirError(dups: DuplicateAgentDir[]): string {

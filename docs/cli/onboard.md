@@ -25,6 +25,24 @@ openclaw onboard --flow manual
 openclaw onboard --mode remote --remote-url ws://gateway-host:18789
 ```
 
+Organization template flow (interactive):
+
+- During local onboarding, the wizard asks for **Organization template (domain)** and **Organization root directory (orgRoot)**.
+- Template examples: `app-service-dev`, `image-creative`, `legal`, `medical`, `real-estate`, `accounting`, `ecommerce`, `marketing`, `education`, `hr`.
+- Generated outputs include:
+  - `agents.list[]` role agents (for example `app-service-dev-ceo`, `app-service-dev-dev`)
+  - `tools.agentToAgent` allowlist for generated agent IDs
+  - `<orgRoot>/<agentId>/workspace` and `<orgRoot>/<agentId>/.openclaw/agent`
+  - `<orgRoot>/shared/templates/*` and `<orgRoot>/shared/STATUS_BOARD.md`
+  - If Telegram is selected during onboarding, optional peer-to-agent routing rules are added to `bindings[]`
+    - DM example: `{ agentId: "app-service-dev-dev", match: { channel: "telegram", accountId: "default", peer: { kind: "dm", id: "123456789" } } }`
+    - Group example: `{ agentId: "app-service-dev-qa", match: { channel: "telegram", accountId: "default", peer: { kind: "group", id: "-1001234567890:topic:99" } } }`
+
+Related docs:
+
+- [Multi-agent concept](/concepts/multi-agent)
+- [CLI Onboarding Reference](/start/wizard-cli-reference)
+
 Flow notes:
 
 - `quickstart`: minimal prompts, auto-generates a gateway token.

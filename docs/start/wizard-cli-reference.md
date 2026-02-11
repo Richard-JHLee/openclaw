@@ -47,6 +47,14 @@ It does not install or modify anything on the remote host.
     - Seeds workspace files needed for first-run bootstrap ritual.
     - Workspace layout: [Agent workspace](/concepts/agent-workspace).
   </Step>
+  <Step title="Organization template (domain)">
+    - Local onboarding prompts for a domain template and `orgRoot`.
+    - Built-in templates include legal, medical, real-estate, accounting, ecommerce, marketing, education, hr, app-service-dev, and image-creative.
+    - The wizard writes role-based `agents.list[]`, CLI/WebChat bindings for the default role, and `tools.agentToAgent.allow`.
+    - It also creates per-agent directories under `<orgRoot>/<agentId>/` plus shared docs under `<orgRoot>/shared/`.
+    - `agentDir` must be unique per agent (duplicate paths are rejected).
+    - If Telegram is selected in channel setup, onboarding can collect peer targets (DM user id or group/topic id) and auto-create `bindings[]` rules per agent.
+  </Step>
   <Step title="Gateway">
     - Prompts for port, bind, auth mode, and tailscale exposure.
     - Recommended: keep token auth enabled even for loopback so local WS clients must authenticate.
@@ -201,10 +209,13 @@ to the gateway host.
 Typical fields in `~/.openclaw/openclaw.json`:
 
 - `agents.defaults.workspace`
+- `agents.list[]` (role agents when organization template flow is used)
 - `agents.defaults.model` / `models.providers` (if Minimax chosen)
 - `gateway.*` (mode, bind, auth, tailscale)
 - `channels.telegram.botToken`, `channels.discord.token`, `channels.signal.*`, `channels.imessage.*`
 - Channel allowlists (Slack, Discord, Matrix, Microsoft Teams) when you opt in during prompts (names resolve to IDs when possible)
+- `tools.agentToAgent` (enabled + allowlist for generated org template agent IDs)
+- `bindings[]` Telegram peer routes (when configured in org-template onboarding)
 - `skills.install.nodeManager`
 - `wizard.lastRunAt`
 - `wizard.lastRunVersion`

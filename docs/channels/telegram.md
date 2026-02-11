@@ -38,6 +38,7 @@ Minimal config:
 - A Telegram Bot API channel owned by the Gateway.
 - Deterministic routing: replies go back to Telegram; the model never chooses channels.
 - DMs share the agent's main session; groups stay isolated (`agent:<agentId>:telegram:group:<chatId>`).
+- Multi-agent routing is controlled by `bindings[]` and can match by `accountId` and `peer` (DM/group/topic).
 
 ## Setup (fast path)
 
@@ -77,6 +78,39 @@ Multi-account support: use `channels.telegram.accounts` with per-account tokens 
 3. Start the gateway. Telegram starts when a token is resolved (config first, env fallback).
 4. DM access defaults to pairing. Approve the code when the bot is first contacted.
 5. For groups: add the bot, decide privacy/admin behavior (below), then set `channels.telegram.groups` to control mention gating + allowlists.
+
+## Multi-agent peer routing
+
+Use Telegram peer bindings to route different users/groups to different agents:
+
+```json5
+{
+  bindings: [
+    {
+      agentId: "app-service-dev-dev",
+      match: {
+        channel: "telegram",
+        accountId: "default",
+        peer: { kind: "dm", id: "123456789" },
+      },
+    },
+    {
+      agentId: "app-service-dev-qa",
+      match: {
+        channel: "telegram",
+        accountId: "default",
+        peer: { kind: "group", id: "-1001234567890:topic:99" },
+      },
+    },
+  ],
+}
+```
+
+Notes:
+
+- `peer.kind: "dm"` uses Telegram user id.
+- `peer.kind: "group"` uses group id; forum topics use `-100...:topic:<threadId>`.
+- Onboarding can create these bindings automatically when using organization templates and selecting Telegram.
 
 ## Token + privacy + permissions (Telegram side)
 
