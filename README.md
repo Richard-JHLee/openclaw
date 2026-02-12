@@ -53,6 +53,31 @@ OpenClaw now includes a **SmartModelRouter** that automatically selects the most
 
 See [SmartModelRouter Documentation](SMART_ROUTER_README.md) for details.
 
+### 🧑‍🤝‍🧑 Team onboarding + Telegram single-inbox routing (New!)
+
+OpenClaw’s onboarding wizard can now scaffold a **team-style multi-agent workspace** (CEO/PM/Dev/QA/etc) and optionally set up **Telegram peer routing** so specific Telegram DMs/groups land in the right agent session.
+
+- **Wizard scaffolding**: choose an organization template (domain) and an org root directory; the wizard generates per-agent workspaces + isolated agent dirs.
+- **Telegram peer routing**: route a specific Telegram **DM** or **group** (peer) to a chosen agent via `bindings`.
+- **Recommended ops**: route your Telegram DM to **CEO** (single inbox). The CEO delegates to specialist agents internally (PM/Dev/QA) and sends the final, user-facing reply back on Telegram.
+
+Example `bindings` (JSON5) for “DM → CEO”:
+
+```json5
+[
+  {
+    agentId: "team-ceo",
+    match: {
+      channel: "telegram",
+      accountId: "default",
+      peer: { kind: "dm", id: "123456789" },
+    },
+  },
+]
+```
+
+Docs: [Wizard](https://docs.openclaw.ai/start/wizard) · [Telegram](https://docs.openclaw.ai/channels/telegram) · [Configuration (bindings)](https://docs.openclaw.ai/gateway/configuration) · [Session tools (agent-to-agent)](https://docs.openclaw.ai/concepts/session-tool)
+
 ### 🧩 How Smart Routing Works
 
 The router calculates a **complexity score (0-100)** based on:
@@ -66,11 +91,11 @@ The router calculates a **complexity score (0-100)** based on:
 
 #### Model Tiers
 
-| Score Range | Tier | Recommended Models | Use Case |
-| :--- | :--- | :--- | :--- |
-| **0 - 34** | **Cheap** | `gpt-4o-mini`, `claude-3-haiku` | Simple chat, greetings, short Q&A |
-| **35 - 64** | **Mid** | `gpt-4o`, `claude-3-5-sonnet` | Standard coding, explanations, summaries |
-| **65 - 100** | **Premium**| `o1`, `o3`, `claude-3-opus` | Complex reasoning, architecture design, math |
+| Score Range  | Tier        | Recommended Models              | Use Case                                     |
+| :----------- | :---------- | :------------------------------ | :------------------------------------------- |
+| **0 - 34**   | **Cheap**   | `gpt-4o-mini`, `claude-3-haiku` | Simple chat, greetings, short Q&A            |
+| **35 - 64**  | **Mid**     | `gpt-4o`, `claude-3-5-sonnet`   | Standard coding, explanations, summaries     |
+| **65 - 100** | **Premium** | `o1`, `o3`, `claude-3-opus`     | Complex reasoning, architecture design, math |
 
 You can customize these thresholds in `src/model-routing/defaults.ts` or via config.
 
