@@ -73,9 +73,9 @@ function renderRoleAgentsDoc(params: {
           "",
           "2) Wait for all replies (or a clear timeout), then synthesize.",
           "",
-          "3) Reply to the user once with a complete, high-confidence answer.
-
-Implementation tip: use the `sessions_fanout` tool to request PM/Developer/QA in parallel and collect their replies in one result.",
+          "3) Reply to the user once with a complete, high-confidence answer.",
+          "",
+          "Implementation tip: use the `sessions_fanout` tool to request PM/Developer/QA in parallel and collect their replies in one result.",
           "",
           "Do not end your turn with 'I asked PM/Dev/QA' unless you also include their outputs or a clear reason you couldn't (e.g. tool failure).",
           "",
