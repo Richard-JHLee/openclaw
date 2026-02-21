@@ -130,7 +130,9 @@ export function applySettingsFromUrl(host: SettingsHost) {
   if (gatewayUrlRaw != null) {
     const gatewayUrl = gatewayUrlRaw.trim();
     if (gatewayUrl && gatewayUrl !== host.settings.gatewayUrl) {
-      host.pendingGatewayUrl = gatewayUrl;
+      if (isGatewayUrlAllowedFromQuery(gatewayUrl)) {
+        host.pendingGatewayUrl = gatewayUrl;
+      }
     }
     params.delete("gatewayUrl");
     hashParams.delete("gatewayUrl");
@@ -144,6 +146,36 @@ export function applySettingsFromUrl(host: SettingsHost) {
   const nextHash = hashParams.toString();
   url.hash = nextHash ? `#${nextHash}` : "";
   window.history.replaceState({}, "", url.toString());
+}
+
+function isLoopbackHostname(hostname: string): boolean {
+  const normalized = hostname.trim().toLowerCase();
+  return (
+    normalized === "localhost" ||
+    normalized === "127.0.0.1" ||
+    normalized === "::1" ||
+    normalized === "[::1]"
+  );
+}
+
+function isGatewayUrlAllowedFromQuery(raw: string): boolean {
+  try {
+    const parsed = new URL(raw);
+    const protocol = parsed.protocol.toLowerCase();
+    if (protocol !== "ws:" && protocol !== "wss:") {
+      return false;
+    }
+    if (isLoopbackHostname(parsed.hostname)) {
+      return true;
+    }
+    if (typeof window === "undefined") {
+      return false;
+    }
+    const currentHost = window.location.hostname.trim().toLowerCase();
+    return Boolean(currentHost) && parsed.hostname.trim().toLowerCase() === currentHost;
+  } catch {
+    return false;
+  }
 }
 
 export function setTab(host: SettingsHost, next: Tab) {

@@ -13,6 +13,7 @@ import { formatDocsLink } from "../../../terminal/links.js";
 import { addWildcardAllowFrom, promptAccountId } from "./helpers.js";
 
 const channel = "telegram" as const;
+const TELEGRAM_LOOKUP_TIMEOUT_MS = 10_000;
 
 function setTelegramDmPolicy(cfg: OpenClawConfig, dmPolicy: DmPolicy) {
   const allowFrom =
@@ -87,7 +88,7 @@ async function promptTelegramAllowFrom(params: {
     const username = stripped.startsWith("@") ? stripped : `@${stripped}`;
     const url = `https://api.telegram.org/bot${token}/getChat?chat_id=${encodeURIComponent(username)}`;
     try {
-      const res = await fetch(url);
+      const res = await fetch(url, { signal: AbortSignal.timeout(TELEGRAM_LOOKUP_TIMEOUT_MS) });
       if (!res.ok) {
         return null;
       }

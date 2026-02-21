@@ -148,10 +148,12 @@ async function resolveNodePath(): Promise<string> {
 }
 
 async function resolveBinaryPath(binary: string): Promise<string> {
-  const { execSync } = await import("node:child_process");
+  const { execFileSync } = await import("node:child_process");
   const cmd = process.platform === "win32" ? "where" : "which";
   try {
-    const output = execSync(`${cmd} ${binary}`, { encoding: "utf8" }).trim();
+    // Use execFileSync (no shell) to avoid command injection footguns if this
+    // helper ever expands to support arbitrary binaries in the future.
+    const output = execFileSync(cmd, [binary], { encoding: "utf8" }).trim();
     const resolved = output.split(/\r?\n/)[0]?.trim();
     if (!resolved) {
       throw new Error("empty");

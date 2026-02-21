@@ -26,6 +26,7 @@ Be concise; concise review > grammar. Omit any non-applicable sections.
 - `pnpm check`
 - `pnpm build`
 - `pnpm test`
+- `pnpm security:audit`
 - Protocol changes: `pnpm protocol:check`
 
 ## Progressive disclosure

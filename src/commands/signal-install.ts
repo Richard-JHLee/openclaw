@@ -30,6 +30,48 @@ export type SignalInstallResult = {
   error?: string;
 };
 
+const MAX_SIGNAL_CLI_ARCHIVE_BYTES = 250 * 1024 * 1024; // 250MB safety cap
+
+function normalizeHostname(hostname: string): string {
+  const normalized = hostname.trim().toLowerCase().replace(/\.$/, "");
+  if (normalized.startsWith("[") && normalized.endsWith("]")) {
+    return normalized.slice(1, -1);
+  }
+  return normalized;
+}
+
+export function isAllowedGitHubDownloadHost(hostname: string): boolean {
+  const normalized = normalizeHostname(hostname);
+  if (!normalized) {
+    return false;
+  }
+  // signal-cli assets are fetched from GitHub release URLs which commonly redirect
+  // to GitHub-owned asset hosts. Keep a small allowlist to avoid unexpected downloads.
+  const allowed = [
+    "github.com",
+    "objects.githubusercontent.com",
+    "release-assets.githubusercontent.com",
+    "github-releases.githubusercontent.com",
+  ];
+  return allowed.some((entry) => normalized === entry || normalized.endsWith(`.${entry}`));
+}
+
+export function assertAllowedDownloadUrl(rawUrl: string): URL {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    throw new Error(`Invalid download URL: ${rawUrl}`);
+  }
+  if (parsed.protocol !== "https:") {
+    throw new Error(`Refusing non-HTTPS download URL: ${parsed.protocol}`);
+  }
+  if (!isAllowedGitHubDownloadHost(parsed.hostname)) {
+    throw new Error(`Refusing download from unexpected host: ${parsed.hostname}`);
+  }
+  return parsed;
+}
+
 function looksLikeArchive(name: string): boolean {
   return name.endsWith(".tar.gz") || name.endsWith(".tgz") || name.endsWith(".zip");
 }
@@ -66,15 +108,18 @@ function pickAsset(assets: ReleaseAsset[], platform: NodeJS.Platform) {
 }
 
 async function downloadToFile(url: string, dest: string, maxRedirects = 5): Promise<void> {
+  // Validate upfront (and on redirects) to avoid downloading from unexpected hosts.
+  const parsedUrl = assertAllowedDownloadUrl(url);
   await new Promise<void>((resolve, reject) => {
-    const req = request(url, (res) => {
+    const req = request(parsedUrl, (res) => {
       if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400) {
         const location = res.headers.location;
         if (!location || maxRedirects <= 0) {
           reject(new Error("Redirect loop or missing Location header"));
           return;
         }
-        const redirectUrl = new URL(location, url).href;
+        const redirectUrl = new URL(location, parsedUrl.href).href;
+        res.resume();
         resolve(downloadToFile(redirectUrl, dest, maxRedirects - 1));
         return;
       }
@@ -82,7 +127,33 @@ async function downloadToFile(url: string, dest: string, maxRedirects = 5): Prom
         reject(new Error(`HTTP ${res.statusCode ?? "?"} downloading file`));
         return;
       }
-      const out = createWriteStream(dest);
+      const contentLengthHeader = res.headers["content-length"];
+      const contentLength =
+        typeof contentLengthHeader === "string"
+          ? Number(contentLengthHeader)
+          : Array.isArray(contentLengthHeader)
+            ? Number(contentLengthHeader[0])
+            : Number.NaN;
+      if (Number.isFinite(contentLength) && contentLength > MAX_SIGNAL_CLI_ARCHIVE_BYTES) {
+        reject(
+          new Error(
+            `Download exceeds safety limit (${MAX_SIGNAL_CLI_ARCHIVE_BYTES} bytes): content-length=${contentLength}`,
+          ),
+        );
+        res.destroy();
+        return;
+      }
+
+      let total = 0;
+      res.on("data", (chunk) => {
+        total += chunk.length;
+        if (total > MAX_SIGNAL_CLI_ARCHIVE_BYTES) {
+          req.destroy(
+            new Error(`Download exceeds safety limit (${MAX_SIGNAL_CLI_ARCHIVE_BYTES} bytes)`),
+          );
+        }
+      });
+      const out = createWriteStream(dest, { mode: 0o600 });
       pipeline(res, out).then(resolve).catch(reject);
     });
     req.on("error", reject);

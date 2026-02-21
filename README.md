@@ -197,6 +197,15 @@ Default behavior on Telegram/WhatsApp/Signal/iMessage/Microsoft Teams/Discord/Go
 
 Run `openclaw doctor` to surface risky/misconfigured DM policies.
 
+### Recent security hardening
+
+- Added repeatable security audit commands:
+  - `pnpm security:audit` (baseline)
+  - `pnpm security:audit:deep` (best-effort deep probe)
+- Control UI `gatewayUrl` query handling now requires explicit user confirmation and ignores remote/untrusted hosts from URL params.
+- `MEDIA:` parsing only accepts safe relative local paths (`./...`) and blocks absolute/tilde/traversal/file URI forms.
+- Download paths and command execution helpers were tightened to reduce command injection and unsafe redirect/download risks.
+
 ## Highlights
 
 - **[Local-first Gateway](https://docs.openclaw.ai/gateway)** — single control plane for sessions, channels, tools, and events.

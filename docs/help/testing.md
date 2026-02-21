@@ -23,11 +23,13 @@ This doc is a “how we test” guide:
 Most days:
 
 - Full gate (expected before push): `pnpm build && pnpm check && pnpm test`
+- Security audit baseline: `pnpm security:audit`
 
 When you touch tests or want extra confidence:
 
 - Coverage gate: `pnpm test:coverage`
 - E2E suite: `pnpm test:e2e`
+- Deep security probe (best-effort gateway checks): `pnpm security:audit:deep`
 
 When debugging real providers/models (requires real creds):
 

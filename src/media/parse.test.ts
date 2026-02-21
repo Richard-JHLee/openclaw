@@ -32,6 +32,12 @@ describe("splitMediaFromOutput", () => {
     expect(result.text).toBe("MEDIA:../../etc/passwd");
   });
 
+  it("rejects file:// media paths to prevent LFI", () => {
+    const result = splitMediaFromOutput("MEDIA:file:///etc/passwd");
+    expect(result.mediaUrls).toBeUndefined();
+    expect(result.text).toBe("MEDIA:file:///etc/passwd");
+  });
+
   it("captures safe relative media paths", () => {
     const result = splitMediaFromOutput("MEDIA:./screenshots/image.png");
     expect(result.mediaUrls).toEqual(["./screenshots/image.png"]);

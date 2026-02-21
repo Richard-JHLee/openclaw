@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { WebSocket } from "ws";
 import { GATEWAY_CLIENT_MODES, GATEWAY_CLIENT_NAMES } from "../utils/message-channel.js";
 import { buildDeviceAuthPayload } from "./device-auth.js";
@@ -290,6 +290,27 @@ describe("gateway server auth/connect", () => {
       });
       expect(res.ok).toBe(false);
       expect(res.error?.message ?? "").toContain("secure context");
+      ws.close();
+    });
+
+    test("rejects control ui websocket from disallowed origin", async () => {
+      const ws = new WebSocket(`ws://127.0.0.1:${port}`, {
+        headers: {
+          origin: "https://evil.example",
+        },
+      });
+      await new Promise<void>((resolve) => ws.once("open", resolve));
+      const res = await connectReq(ws, {
+        token: "secret",
+        client: {
+          id: GATEWAY_CLIENT_NAMES.CONTROL_UI,
+          version: "1.0.0",
+          platform: "web",
+          mode: GATEWAY_CLIENT_MODES.WEBCHAT,
+        },
+      });
+      expect(res.ok).toBe(false);
+      expect(res.error?.message ?? "").toContain("origin not allowed");
       ws.close();
     });
   });
